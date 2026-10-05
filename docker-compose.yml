@@ -99,3 +99,17 @@ services:
     networks:
       - nebus-network
     restart: unless-stopped
+
+  frontend:
+    container_name: nebus-frontend
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - nebus-network
+    restart: unless-stopped

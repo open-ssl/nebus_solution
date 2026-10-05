@@ -1,5 +1,7 @@
 [tool.uv.workspace]
 members = ["shared", "services/*"]
+# frontend is a static nginx service, not a Python package.
+exclude = ["services/frontend"]
 
 [tool.uv.sources]
 nb-shared = { workspace = true }

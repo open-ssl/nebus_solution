@@ -62,7 +62,8 @@ nebus_solution/
 └── services/
     ├── api/                  # nb-api (FastAPI)
     ├── consumer/             # nb-consumer (FastStream worker)
-    └── outbox_publisher/     # nb-outbox-publisher (outbox relay)
+    ├── outbox_publisher/     # nb-outbox-publisher (outbox relay)
+    └── frontend/             # static nginx test console (not a Python package)
 ```
 
 Each Python service follows a layered layout inside `src/<name>/`: `api/`
@@ -82,6 +83,18 @@ The API is served on `http://localhost:8000` (Swagger UI at `/docs`).
 RabbitMQ management UI: `http://localhost:15672` (guest/guest by default).
 Migrations are applied automatically by the `api` container on startup
 (`alembic upgrade head`).
+
+### Test console (UI)
+
+A tiny static web console is served at **`http://localhost:3000`** for exercising
+the service by hand: fill in a payment, submit it, and watch the status move from
+`pending` to `succeeded`/`failed` live (it polls `GET` after creation). The page
+is nginx reverse-proxying `/api` to the API, so it is same-origin (no CORS).
+
+Enter your `X-API-Key` in the console's Auth field — it must match the API's
+`API_KEY` from `.env` (the example default is `dev-secret-key`). To see the
+delivered webhook, point **Webhook URL** at a real receiver (e.g. a webhook.site
+URL).
 
 ### Local development
 

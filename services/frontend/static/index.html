@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nebus Payments — Test Console</title>
+  <style>
+    :root {
+      --bg: #0f1115; --card: #181b22; --muted: #8b93a7; --text: #e6e9ef;
+      --border: #272b35; --accent: #4f8cff; --accent-press: #3a72d8;
+      --ok: #2ecc71; --fail: #ff5c5c; --pending: #f5a623; --input: #11141a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f6fb; --card: #ffffff; --muted: #5b6375; --text: #1c2030;
+        --border: #e2e6ef; --accent: #2f6bff; --accent-press: #2457d8;
+        --ok: #16a34a; --fail: #dc2626; --pending: #c2820a; --input: #f7f9fc;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      padding: 32px 16px;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card h2 { font-size: 15px; margin: 0 0 16px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; }
+    input, select, textarea {
+      width: 100%; background: var(--input); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font: inherit;
+    }
+    textarea { resize: vertical; min-height: 60px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+    .idem { display: flex; gap: 8px; }
+    .idem input { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; }
+    button {
+      background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+      padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    button:hover { background: var(--accent-press); }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); padding: 9px 12px; }
+    .mt { margin-top: 18px; }
+    pre {
+      background: var(--input); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px; overflow-x: auto; font-size: 12.5px; margin: 12px 0 0; white-space: pre-wrap; word-break: break-word;
+    }
+    .badge { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+    .badge.pending { background: color-mix(in srgb, var(--pending) 22%, transparent); color: var(--pending); }
+    .badge.succeeded { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
+    .badge.failed { background: color-mix(in srgb, var(--fail) 20%, transparent); color: var(--fail); }
+    .badge.error { background: color-mix(in srgb, var(--fail) 20%, transparent); color: var(--fail); }
+    .statusline { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+    .cfg { margin-bottom: 20px; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Nebus Payments — Test Console</h1>
+    <p class="sub">Create a payment and watch it settle asynchronously (pending → succeeded / failed). Requests go to the API through this page's reverse proxy.</p>
+
+    <div class="card cfg">
+      <h2>Auth</h2>
+      <label for="apiKey">X-API-Key</label>
+      <input id="apiKey" value="dev-secret-key" />
+      <p class="hint">Must match the API's <code>API_KEY</code> (default <code>dev-secret-key</code>).</p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Create payment</h2>
+        <div class="row">
+          <div>
+            <label for="amount">Amount</label>
+            <input id="amount" type="text" value="199.99" />
+          </div>
+          <div>
+            <label for="currency">Currency</label>
+            <select id="currency">
+              <option>RUB</option><option>USD</option><option>EUR</option>
+            </select>
+          </div>
+        </div>
+        <label for="description">Description</label>
+        <input id="description" value="Test order" />
+        <label for="webhook">Webhook URL</label>
+        <input id="webhook" value="https://example.com/webhooks/payments" />
+        <p class="hint">Use a real receiver (e.g. a webhook.site URL) to see the delivered notification.</p>
+        <label for="metadata">Metadata (JSON)</label>
+        <textarea id="metadata">{"order_id": 123}</textarea>
+        <label for="idem">Idempotency-Key</label>
+        <div class="idem">
+          <input id="idem" />
+          <button class="ghost" type="button" onclick="newIdem()">↻</button>
+        </div>
+        <div class="mt"><button type="button" onclick="createPayment()">Create payment</button></div>
+        <div id="createStatus" class="statusline" hidden></div>
+        <pre id="createOut" hidden></pre>
+      </div>
+
+      <div class="card">
+        <h2>Look up payment</h2>
+        <label for="lookupId">Payment ID</label>
+        <input id="lookupId" placeholder="paste a payment_id" />
+        <div class="mt"><button type="button" onclick="lookup()">Fetch</button></div>
+        <div id="lookupStatus" class="statusline" hidden></div>
+        <pre id="lookupOut" hidden></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+        }));
+    const newIdem = () => { document.getElementById("idem").value = uuid(); };
+    newIdem();
+
+    const apiKey = () => document.getElementById("apiKey").value.trim();
+    const show = (el, obj) => { el.hidden = false; el.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); };
+    const badge = (status) => `<span class="badge ${status}">${status}</span>`;
+
+    async function createPayment() {
+      const statusEl = document.getElementById("createStatus");
+      const outEl = document.getElementById("createOut");
+      outEl.hidden = true;
+      let metadata;
+      try { metadata = JSON.parse(document.getElementById("metadata").value || "{}"); }
+      catch { statusEl.hidden = false; statusEl.innerHTML = badge("error") + " metadata is not valid JSON"; return; }
+
+      const body = {
+        amount: document.getElementById("amount").value.trim(),
+        currency: document.getElementById("currency").value,
+        description: document.getElementById("description").value,
+        metadata,
+        webhook_url: document.getElementById("webhook").value.trim(),
+      };
+      statusEl.hidden = false; statusEl.innerHTML = "Submitting…";
+      try {
+        const res = await fetch("/api/v1/payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": apiKey(), "Idempotency-Key": document.getElementById("idem").value },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        show(outEl, data);
+        if (!res.ok) { statusEl.innerHTML = badge("error") + ` HTTP ${res.status}`; return; }
+        document.getElementById("lookupId").value = data.payment_id;
+        await poll(data.payment_id, statusEl, outEl);
+      } catch (e) {
+        statusEl.innerHTML = badge("error") + " " + e;
+      }
+    }
+
+    async function poll(id, statusEl, outEl) {
+      for (let i = 0; i < 40; i++) {
+        const res = await fetch(`/api/v1/payments/${id}`, { headers: { "X-API-Key": apiKey() } });
+        const data = await res.json();
+        show(outEl, data);
+        if (!res.ok) { statusEl.innerHTML = badge("error") + ` HTTP ${res.status}`; return; }
+        statusEl.innerHTML = badge(data.status) + (data.status === "pending" ? " processing…" : " settled");
+        if (data.status !== "pending") return;
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      statusEl.innerHTML += " (stopped polling)";
+    }
+
+    async function lookup() {
+      const id = document.getElementById("lookupId").value.trim();
+      const statusEl = document.getElementById("lookupStatus");
+      const outEl = document.getElementById("lookupOut");
+      if (!id) { statusEl.hidden = false; statusEl.innerHTML = badge("error") + " enter a payment_id"; return; }
+      statusEl.hidden = false; statusEl.innerHTML = "Fetching…";
+      try {
+        const res = await fetch(`/api/v1/payments/${id}`, { headers: { "X-API-Key": apiKey() } });
+        const data = await res.json();
+        show(outEl, data);
+        statusEl.innerHTML = res.ok ? badge(data.status) : badge("error") + ` HTTP ${res.status}`;
+      } catch (e) {
+        statusEl.innerHTML = badge("error") + " " + e;
+      }
+    }
+  </script>
+</body>
+</html>
