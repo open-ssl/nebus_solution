@@ -41,4 +41,4 @@ COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 
 USER appuser
 
-ENTRYPOINT ["faststream", "run", "consumer.main:app"]
+ENTRYPOINT ["python", "-m", "consumer.main"]

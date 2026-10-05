@@ -6,7 +6,7 @@ import httpx
 from faststream import FastStream
 from faststream.exceptions import RejectMessage
 from faststream.rabbit import RabbitBroker, RabbitMessage
-from shared.broker import dlx_exchange, payments_dlq, payments_exchange, payments_new_queue
+from shared.broker import declare_topology, payments_dlq, payments_exchange, payments_new_queue
 from shared.config import settings
 from shared.db.session import engine, session_factory
 from shared.schemas import PaymentEvent
@@ -33,10 +33,10 @@ runtime = _Runtime()
 
 @app.after_startup
 async def on_startup() -> None:
-    # Ensure the dead-letter side of the topology exists so rejected messages
-    # are actually routed to payments.dlq (a missing DLX silently drops them).
-    await broker.declare_exchange(dlx_exchange)
-    await broker.declare_queue(payments_dlq)
+    # Declare the full topology (exchanges, queues, and the DLX bindings) so
+    # rejected messages are routed to payments.dlq even if the consumer is the
+    # first service to start (a missing DLX binding silently drops them).
+    await declare_topology(broker)
 
     runtime.http_client = httpx.AsyncClient()
     runtime.processor = PaymentProcessor(session_factory, runtime.http_client)

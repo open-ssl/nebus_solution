@@ -4,7 +4,7 @@ import asyncio
 import logging
 
 from faststream.rabbit import RabbitBroker
-from shared.broker import dlx_exchange, payments_dlq, payments_exchange, payments_new_queue
+from shared.broker import declare_topology
 
 
 logger = logging.getLogger("outbox_publisher.broker")
@@ -13,18 +13,15 @@ logger = logging.getLogger("outbox_publisher.broker")
 async def connect(url: str, *, retries: int = 10, delay: float = 1.0) -> RabbitBroker:
     """Connect to RabbitMQ (with startup retries) and declare the topology.
 
-    Declaring the exchanges and queues here means the relay provisions them on
-    first start, independent of consumer startup order.
+    Declaring the exchanges, queues, and bindings here means the relay
+    provisions them on first start, independent of consumer startup order.
     """
     broker = RabbitBroker(url)
     last_error: Exception | None = None
     for attempt in range(1, retries + 1):
         try:
             await broker.connect()
-            await broker.declare_exchange(payments_exchange)
-            await broker.declare_exchange(dlx_exchange)
-            await broker.declare_queue(payments_new_queue)
-            await broker.declare_queue(payments_dlq)
+            await declare_topology(broker)
             logger.info("connected to RabbitMQ and declared payments topology")
             return broker
         except Exception as error:  # noqa: BLE001
