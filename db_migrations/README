@@ -1,0 +1,14 @@
+Alembic migrations for the nebus payment service.
+
+The database URL is injected at runtime from `shared.config.settings`
+(asyncpg DSN), so no credentials live in alembic.ini.
+
+Common commands (run from the repository root):
+
+    make migrate                               # alembic upgrade head
+    make makemigration ARGS="-m 'add payments'"   # autogenerate a revision
+    uv run alembic downgrade -1                 # roll back one revision
+    uv run alembic history                      # list revisions
+
+Models live in `shared/src/shared/models/` and must subclass
+`shared.db.base.Base` to be picked up by autogenerate.

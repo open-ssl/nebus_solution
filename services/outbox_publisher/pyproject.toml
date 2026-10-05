@@ -1,0 +1,19 @@
+[project]
+name = "nb-outbox-publisher"
+version = "0.1.0"
+description = "Nebus transactional outbox relay: polls the outbox table and publishes events to RabbitMQ."
+requires-python = ">=3.12"
+dependencies = [
+    "nb-shared",
+    "faststream[rabbit]>=0.5",
+]
+
+[tool.uv.sources]
+nb-shared = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/outbox_publisher"]
