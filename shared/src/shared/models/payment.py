@@ -19,9 +19,7 @@ class Payment(Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     # Attribute is not named `metadata` because that collides with Base.metadata.
     extra_metadata: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
-    status: Mapped[PaymentStatus] = mapped_column(
-        String(16), nullable=False, default=PaymentStatus.PENDING, index=True
-    )
+    status: Mapped[PaymentStatus] = mapped_column(String(16), nullable=False, default=PaymentStatus.PENDING, index=True)
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     webhook_url: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

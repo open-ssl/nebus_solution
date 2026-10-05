@@ -18,9 +18,7 @@ class PaymentRepository:
         return await self.session.get(Payment, payment_id)
 
     async def get_by_idempotency_key(self, idempotency_key: str) -> Payment | None:
-        result = await self.session.execute(
-            select(Payment).where(Payment.idempotency_key == idempotency_key)
-        )
+        result = await self.session.execute(select(Payment).where(Payment.idempotency_key == idempotency_key))
         return result.scalar_one_or_none()
 
     async def create_with_outbox(self, payment: Payment, event: OutboxEvent) -> Payment:

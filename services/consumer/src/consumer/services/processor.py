@@ -87,9 +87,7 @@ class PaymentProcessor:
 
     async def _post_once(self, event: PaymentEvent, payload: dict) -> None:
         try:
-            response = await self._http.post(
-                event.webhook_url, json=payload, timeout=settings.WEBHOOK_TIMEOUT_SECONDS
-            )
+            response = await self._http.post(event.webhook_url, json=payload, timeout=settings.WEBHOOK_TIMEOUT_SECONDS)
             response.raise_for_status()
         except httpx.HTTPError as error:
             logger.warning("webhook %s delivery attempt failed: %s", event.payment_id, error)
