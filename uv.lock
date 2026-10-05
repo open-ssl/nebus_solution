@@ -1027,6 +1027,7 @@ source = { editable = "shared" }
 dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "faststream", extra = ["rabbit"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
@@ -1036,6 +1037,7 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "asyncpg", specifier = ">=0.30" },
+    { name = "faststream", extras = ["rabbit"], specifier = ">=0.5" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },

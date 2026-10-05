@@ -6,6 +6,10 @@ import logging
 import signal
 
 from shared.config import settings
+from shared.db.session import engine, session_factory
+
+from outbox_publisher.core.broker import connect
+from outbox_publisher.services.relay import OutboxRelay
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -18,13 +22,8 @@ async def run() -> None:
         settings.OUTBOX_POLL_INTERVAL_SECONDS,
         settings.OUTBOX_BATCH_SIZE,
     )
-
-    # Stage 4: connect to Postgres + RabbitMQ, then loop:
-    #   1. SELECT ... FROM outbox WHERE published_at IS NULL
-    #      ORDER BY created_at LIMIT OUTBOX_BATCH_SIZE FOR UPDATE SKIP LOCKED
-    #   2. publish each event to the payments exchange -> PAYMENTS_NEW_QUEUE
-    #   3. mark the row published (published_at = now()) in the same transaction
-    #   sleep OUTBOX_POLL_INTERVAL_SECONDS between empty polls.
+    broker = await connect(settings.rabbitmq_url)
+    relay = OutboxRelay(broker, session_factory)
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -32,8 +31,22 @@ async def run() -> None:
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, stop.set)
 
-    await stop.wait()
-    logger.info("outbox_publisher stopped")
+    try:
+        while not stop.is_set():
+            try:
+                published = await relay.drain_once()
+            except Exception:
+                logger.exception("outbox poll failed; retrying after interval")
+                published = 0
+            # Back off only when idle; keep draining while there is a backlog.
+            if published == 0:
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(stop.wait(), timeout=settings.OUTBOX_POLL_INTERVAL_SECONDS)
+    finally:
+        logger.info("outbox_publisher shutting down")
+        await broker.close()
+        await engine.dispose()
+        logger.info("outbox_publisher stopped")
 
 
 def main() -> None:
