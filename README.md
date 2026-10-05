@@ -6,9 +6,9 @@ notified of the result via webhook. Delivery guarantees are provided by the
 **transactional outbox pattern**, **idempotency keys**, **retries with
 exponential backoff**, and a **Dead Letter Queue**.
 
-> **Status:** infrastructure skeleton (first commit). Service entry points are
-> runnable stubs; business logic lands in the staged commits described in
-> [Roadmap](#roadmap).
+> **Status:** feature-complete. All eight deliverables are implemented and the
+> full flow is verified end to end under Docker Compose (create → outbox →
+> relay → consume → settle → webhook, with retries and DLQ).
 
 ## Architecture
 
@@ -136,11 +136,21 @@ via Pydantic computed fields — no hardcoded endpoints. Key knobs: `API_KEY`,
 `RETRY_MAX_ATTEMPTS` (3), `RETRY_BACKOFF_BASE_SECONDS`, `PROCESS_SUCCESS_RATE`
 (0.9), `OUTBOX_POLL_INTERVAL_SECONDS`.
 
-## Roadmap
+## Deliverables
 
-1. **Models & migrations** — `Payment` + `OutboxEvent` ORM models, initial Alembic revision.
-2. **API** — Pydantic v2 schemas, `X-API-Key` auth, `POST` / `GET` endpoints, idempotency.
-3. **Outbox relay** — polling publisher with `FOR UPDATE SKIP LOCKED`.
-4. **Consumer** — processing simulation, status updates, webhook delivery.
-5. **Retry & DLQ** — RabbitMQ retry/DLX topology + tenacity webhook retries.
-6. **Tests** — hermetic unit tests across shared + services.
+All eight requirements from the brief are implemented:
+
+1. ✅ **Models & migrations** — `Payment` + `OutboxEvent`, initial Alembic revision.
+2. ✅ **API** — Pydantic v2 schemas, `X-API-Key` auth, `POST` (202) / `GET`, idempotency.
+3. ✅ **Consumer** — one handler: simulate → update status → deliver webhook.
+4. ✅ **Outbox pattern** — atomic payment+event write, relay with `FOR UPDATE SKIP LOCKED`.
+5. ✅ **Retry** — 3 webhook attempts with exponential backoff (tenacity).
+6. ✅ **Dead Letter Queue** — `payments.new` → DLX → `payments.dlq` after exhausted retries.
+7. ✅ **Docker** — Compose with postgres, rabbitmq, api, consumer (+ outbox_publisher).
+8. ✅ **Documentation** — this README (run instructions and examples).
+
+## Testing
+
+Hermetic unit tests (no live Postgres/RabbitMQ — fakes, `monkeypatch`, httpx
+`MockTransport`) cover config, schemas, topology, API auth/service/idempotency,
+the outbox relay, and the consumer's settle/retry/DLQ logic. Run `make test`.
