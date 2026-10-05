@@ -24,6 +24,10 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable --package nb-consumer
 
+# Add the task runner to the venv so the container can launch via `poe`.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install poethepoet
+
 # -----------------------------------------------------------------------------
 # Stage 2: Minimal & Secure Runtime
 # -----------------------------------------------------------------------------
@@ -39,6 +43,9 @@ RUN groupadd -r appgroup && useradd -r -g appgroup -u 10001 appuser
 
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 
+# The poe task definitions live in the root pyproject; poe reads them from cwd.
+COPY --chown=appuser:appgroup pyproject.toml /app/pyproject.toml
+
 USER appuser
 
-ENTRYPOINT ["python", "-m", "consumer.main"]
+ENTRYPOINT ["poe", "consumer"]

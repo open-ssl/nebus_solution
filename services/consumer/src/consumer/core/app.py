@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+import logging
+
+import httpx
+from faststream import FastStream
+from faststream.exceptions import RejectMessage
+from faststream.rabbit import RabbitBroker, RabbitMessage
+from shared.broker import declare_topology, payments_dlq, payments_exchange, payments_new_queue
+from shared.config import settings
+from shared.db.session import engine, session_factory
+from shared.schemas import PaymentEvent
+
+from consumer.core.runtime import Runtime
+from consumer.services.processor import PaymentProcessor, WebhookDeliveryError
+
+
+logger = logging.getLogger("consumer")
+
+
+def create_app() -> FastStream:
+    """Build the broker/app, wire lifecycle hooks and payment subscribers."""
+    broker = RabbitBroker(settings.rabbitmq_url)
+    app = FastStream(broker)
+    runtime = Runtime()
+
+    @app.after_startup
+    async def on_startup() -> None:
+        # Declare the full topology (exchanges, queues, and the DLX bindings) so
+        # rejected messages are routed to payments.dlq even if the consumer is the
+        # first service to start (a missing DLX binding silently drops them).
+        await declare_topology(broker)
+
+        runtime.http_client = httpx.AsyncClient()
+        runtime.processor = PaymentProcessor(session_factory, runtime.http_client)
+        logger.info("consumer ready, consuming %s", settings.PAYMENTS_NEW_QUEUE)
+
+    @app.on_shutdown
+    async def on_shutdown() -> None:
+        if runtime.http_client is not None:
+            await runtime.http_client.aclose()
+        await engine.dispose()
+        logger.info("consumer stopped")
+
+    @broker.subscriber(payments_new_queue, payments_exchange)
+    async def process_payment(event: PaymentEvent, message: RabbitMessage) -> None:
+        assert runtime.processor is not None  # set in after_startup
+        try:
+            await runtime.processor.process(event)
+        except WebhookDeliveryError:
+            logger.error(
+                "payment %s: webhook delivery exhausted after %d attempts -> DLQ",
+                event.payment_id,
+                settings.RETRY_MAX_ATTEMPTS,
+            )
+            # Reject without requeue: the broker dead-letters the message to payments.dlq.
+            raise RejectMessage() from None
+
+    @broker.subscriber(payments_dlq)
+    async def observe_dead_letters(message: RabbitMessage) -> None:
+        logger.error("dead-lettered payment message: %s", message.body)
+
+    return app

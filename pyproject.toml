@@ -123,3 +123,19 @@ shell = "uv run alembic upgrade head"
 [tool.poe.tasks.makemigration]
 help = "Autogenerate a new Alembic revision (pass -m message via ARGS)"
 shell = "uv run alembic revision --autogenerate ${ARGS}"
+
+# ---------------------------------------------------------------------------
+# Service entrypoints. Commands resolve against the .venv (virtualenv executor),
+# so they run unchanged inside the service containers where uv is absent.
+# ---------------------------------------------------------------------------
+[tool.poe.tasks.api]
+help = "Run the API: apply migrations, then serve with uvicorn"
+shell = "alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port ${API_PORT:-8000}"
+
+[tool.poe.tasks.consumer]
+help = "Run the payments consumer"
+cmd = "python -m consumer.main"
+
+[tool.poe.tasks.outbox-publisher]
+help = "Run the transactional outbox relay"
+cmd = "python -m outbox_publisher.main"

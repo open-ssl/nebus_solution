@@ -26,6 +26,10 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable --package nb-api
 
+# 3. Add the task runner to the venv so the container can launch via `poe`.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install poethepoet
+
 # -----------------------------------------------------------------------------
 # Stage 2: Minimal & Secure Runtime
 # -----------------------------------------------------------------------------
@@ -46,8 +50,11 @@ COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini
 COPY --chown=appuser:appgroup db_migrations /app/db_migrations
 
+# The poe task definitions live in the root pyproject; poe reads them from cwd.
+COPY --chown=appuser:appgroup pyproject.toml /app/pyproject.toml
+
 USER appuser
 
 EXPOSE 8000
-# Apply migrations, then launch the API.
-ENTRYPOINT ["sh", "-c", "alembic upgrade head && exec uvicorn api.main:app --host 0.0.0.0 --port ${API_PORT:-8000}"]
+# `poe api` applies migrations, then launches uvicorn (see [tool.poe.tasks.api]).
+ENTRYPOINT ["poe", "api"]
